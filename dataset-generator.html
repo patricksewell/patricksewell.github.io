@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dataset Generator &amp; Rule Accuracy Analyzer</title>
+<style>
+  :root { --bg: #0e1117; --card: #1a1d24; --border: #2d3139; --text: #fafafa;
+           --muted: #a1a7b4; --accent: #4da3ff; --accent2: #09ab3b; --err: #ff4b4b; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+         background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 1.8rem; margin-bottom: 4px; }
+  h2 { font-size: 1.25rem; margin: 28px 0 10px; color: var(--accent); }
+  h3 { font-size: 1.05rem; margin: 18px 0 8px; }
+  p, .caption { color: var(--muted); font-size: 0.88rem; margin-bottom: 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: 8px; padding: 16px; }
+  label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 4px; }
+  input[type=number], select { width: 100%; padding: 7px 10px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.92rem; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .range-row { display: flex; gap: 8px; align-items: center; }
+  .range-row input[type=number] { width: 70px; }
+  .range-val { font-size: 0.82rem; color: var(--accent); min-width: 38px; text-align: center; }
+  button.primary { background: var(--accent); color: #fff; border: none; padding: 12px 32px;
+    border-radius: 8px; font-size: 1rem; cursor: pointer; margin: 20px 0; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.15); }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent);
+    padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 8px 0 16px; }
+  th { background: var(--border); padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(77,163,255,0.06); }
+  .code { background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+          padding: 12px 16px; font-family: 'SF Mono', 'Fira Code', monospace;
+          font-size: 0.85rem; overflow-x: auto; margin: 8px 0 16px; }
+  .metric { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+            padding: 14px 20px; display: inline-block; margin: 10px 8px 10px 0; }
+  .metric .val { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .metric .lbl { font-size: 0.78rem; color: var(--muted); }
+  .warning { background: rgba(255,75,75,0.1); border: 1px solid var(--err);
+             border-radius: 6px; padding: 10px 14px; color: var(--err); font-size: 0.85rem; margin: 6px 0; }
+  .constraint-block { border: 1px solid var(--border); border-radius: 8px;
+                      padding: 14px; margin: 8px 0; background: var(--card); }
+  #results { display: none; }
+  .slider-group { margin-bottom: 12px; }
+  .slider-group .label-row { display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📊 Dataset Generator &amp; Rule Accuracy Analyzer</h1>
+<p>Generate a <strong>1×8 frequency vector</strong> (case1 format) and compute empirical accuracy of all classification rules — entirely in your browser.</p>
+
+<!-- ───── Global parameters ───── -->
+<h2>⚙️ Global Parameters</h2>
+<div class="card" style="max-width:340px;">
+  <label for="inp_N">Total observations N</label>
+  <input type="number" id="inp_N" value="28" min="4" max="10000" step="1">
+</div>
+
+<!-- ───── Pair weight ranges ───── -->
+<h2>📐 Pair Weight Ranges (fraction of N)</h2>
+<p class="caption">Specify the allowed <strong>min–max</strong> share of observations for each (var1, var2) group. The optimiser is free to choose any value within the range.</p>
+<div class="grid2">
+  <div class="card" id="pw_card"></div>
+  <div class="card" id="pw_feasibility"></div>
+</div>
+
+<!-- ───── Conditional probabilities ───── -->
+<h2>1️⃣ Conditional Probabilities P(outcome=1 | var1, var2)</h2>
+<p class="caption">Set the theoretical benchmark for each (var1, var2) pair.</p>
+<div class="grid4" id="cond_prob_grid"></div>
+
+<!-- ───── Accuracy constraints ───── -->
+<h2>2️⃣ Accuracy Constraints (optional)</h2>
+<p class="caption">Specify rules of the form "given var1=a AND var2=b → predict outcome = 0 or 1" and the desired overall accuracy.</p>
+<div class="card" style="max-width:260px; margin-bottom:10px;">
+  <label for="num_constraints">Number of accuracy constraints</label>
+  <input type="number" id="num_constraints" value="0" min="0" max="8" step="1">
+</div>
+<div id="constraints_container"></div>
+
+<!-- ───── Generate button ───── -->
+<button class="primary" onclick="generate()">🚀 Generate Dataset</button>
+
+<!-- ───── Results ───── -->
+<div id="results">
+  <h2>3️⃣ Generated Frequency Vector</h2>
+  <div id="freq_table_container"></div>
+  <div class="code" id="freq_code"></div>
+
+  <h3>Empirical vs Target Conditional Probabilities &amp; Weights</h3>
+  <div id="emp_table_container"></div>
+
+  <h2>4️⃣ Empirical Accuracy of All Rules</h2>
+  <p class="caption">Mapping index for 2-var rules: (0,0) (0,1) (1,0) (1,1)</p>
+  <div id="rules_table_container"></div>
+
+  <div id="constraint_check_container"></div>
+
+  <div id="uncond_metric"></div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+/* ══════════════════════════════════════
+   CASE1 STRUCTURE
+   ══════════════════════════════════════ */
+const CASE1 = [
+  [0,0,0,0],[0,0,0,1],
+  [0,1,0,0],[0,1,0,1],
+  [1,1,0,0],[1,1,0,1],
+  [1,0,0,0],[1,0,0,1]
+];
+const PAIRS = [[0,0],[0,1],[1,1],[1,0]];
+const PAIR_IDX = {
+  '0,0':[0,1], '0,1':[2,3], '1,1':[4,5], '1,0':[6,7]
+};
+const PAIR_LABELS = ['(0,0)','(0,1)','(1,1)','(1,0)'];
+
+/* ── helpers ────────────────────────── */
+function smartRound(vals, target) {
+  const floors = vals.map(v => Math.floor(v));
+  const rems = vals.map((v,i) => v - floors[i]);
+  let deficit = target - floors.reduce((a,b)=>a+b,0);
+  const idx = [...Array(8).keys()].sort((a,b) => rems[b]-rems[a]);
+  for (let i = 0; i < deficit; i++) floors[idx[i]]++;
+  return floors;
+}
+
+function buildData(freq) {
+  const rows = [];
+  for (let i = 0; i < 8; i++)
+    for (let j = 0; j < freq[i]; j++)
+      rows.push({ x1: CASE1[i][0], x2: CASE1[i][1], z: CASE1[i][3] });
+  return rows;
+}
+
+function accuracy(data, predFn) {
+  if (!data.length) return NaN;
+  let correct = 0;
+  for (const r of data) if (predFn(r) === r.z) correct++;
+  return correct / data.length;
+}
+
+/* ── optimiser (grid + refine) ──────── */
+function solve(N, condProbs, pwRanges, accSpecs) {
+  const pairKeys = ['0,0','0,1','1,1','1,0'];
+
+  /* objective: given 4 real pair counts, derive freq, score it */
+  function score(pairCounts) {
+    const freq = new Array(8).fill(0);
+    for (let i = 0; i < 4; i++) {
+      const [r0,r1] = PAIR_IDX[pairKeys[i]];
+      const p1 = condProbs[i];
+      freq[r1] = pairCounts[i] * p1;
+      freq[r0] = pairCounts[i] * (1 - p1);
+    }
+    const freqInt = smartRound(freq, N);
+    const data = buildData(freqInt);
+
+    // loss: conditional‑prob deviation
+    let lossCond = 0;
+    for (let i = 0; i < 4; i++) {
+      const [r0,r1] = PAIR_IDX[pairKeys[i]];
+      const np_ = freqInt[r0] + freqInt[r1];
+      const empP = np_ > 0 ? freqInt[r1]/np_ : 0.5;
+      lossCond += (empP - condProbs[i]) ** 2;
+    }
+
+    // loss: accuracy constraints
+    let lossAcc = 0;
+    for (const spec of accSpecs) {
+      const predFn = r => (r.x1===spec.var1 && r.x2===spec.var2) ? spec.pred_z : 1-spec.pred_z;
+      const acc = accuracy(data, predFn);
+      if (!isNaN(acc)) lossAcc += (acc - spec.target) ** 2;
+    }
+
+    return { loss: 10*lossCond + 50*lossAcc, freqInt };
+  }
+
+  /* grid search over pair‑count allocations */
+  const steps = 20;
+  let bestLoss = Infinity, bestFreq = null;
+
+  function rangeSteps(lo, hi) {
+    const arr = [];
+    for (let s = 0; s <= steps; s++) arr.push(lo + (hi-lo)*s/steps);
+    return arr;
+  }
+
+  const ranges = pwRanges.map(([lo,hi]) => rangeSteps(lo*N, hi*N));
+
+  // For 4 dimensions × 21 steps = ~200k combos – feasible
+  for (const c0 of ranges[0])
+   for (const c1 of ranges[1])
+    for (const c2 of ranges[2])
+     for (const c3 of ranges[3]) {
+       const total = c0+c1+c2+c3;
+       if (Math.abs(total - N) > N*0.02) continue;  // skip infeasible
+       // rescale to sum exactly to N
+       const f = N/total;
+       const pc = [c0*f, c1*f, c2*f, c3*f];
+       const {loss, freqInt} = score(pc);
+       if (loss < bestLoss) { bestLoss = loss; bestFreq = freqInt; }
+     }
+
+  // refine around best
+  if (bestFreq) {
+    // reconstruct pair counts from bestFreq
+    let bestPC = PAIRS.map((_,i) => {
+      const [r0,r1] = PAIR_IDX[pairKeys[i]];
+      return bestFreq[r0] + bestFreq[r1];
+    });
+    const delta = N * 0.03;
+    const fineSteps = 10;
+    for (let iter = 0; iter < 3; iter++) {
+      const fineRanges = bestPC.map(c => {
+        const arr = [];
+        const lo = Math.max(pwRanges[bestPC.indexOf(c)] ? pwRanges[PAIRS.indexOf(PAIRS[bestPC.indexOf(c)])] : 0, c-delta);
+        const hi = c + delta;
+        for (let s = 0; s <= fineSteps; s++) arr.push(Math.max(0, lo + (hi-lo)*s/fineSteps));
+        return arr;
+      });
+      for (const c0 of fineRanges[0])
+       for (const c1 of fineRanges[1])
+        for (const c2 of fineRanges[2])
+         for (const c3 of fineRanges[3]) {
+           const total = c0+c1+c2+c3;
+           if (total < 1) continue;
+           const f = N/total;
+           const pc = [c0*f, c1*f, c2*f, c3*f];
+           const {loss, freqInt} = score(pc);
+           if (loss < bestLoss) { bestLoss = loss; bestFreq = freqInt; bestPC = [...pc]; }
+         }
+    }
+  }
+
+  return bestFreq || smartRound(new Array(8).fill(N/8), N);
+}
+
+/* ── all rules ──────────────────────── */
+function allRules(data) {
+  const rules = [];
+
+  // 1‑variable rules
+  for (const v of ['x1','x2']) {
+    for (const val of [0,1]) {
+      for (const pz of [0,1]) {
+        const predFn = r => r[v]===val ? pz : 1-pz;
+        const name = `${v}=${val} → z=${pz}, else z=${1-pz}`;
+        rules.push({ name, acc: accuracy(data, predFn) });
+      }
+    }
+  }
+
+  // 2‑variable rules (16 mappings)
+  for (let m = 0; m < 16; m++) {
+    const bits = [(m>>3)&1, (m>>2)&1, (m>>1)&1, m&1]; // (0,0),(0,1),(1,0),(1,1)
+    const predFn = r => bits[r.x1*2 + r.x2];
+    const name = `(0,0)→${bits[0]}  (0,1)→${bits[1]}  (1,0)→${bits[2]}  (1,1)→${bits[3]}`;
+    rules.push({ name, acc: accuracy(data, predFn) });
+  }
+
+  rules.sort((a,b) => b.acc - a.acc);
+  return rules;
+}
+
+/* ══════════════════════════════════════
+   UI SETUP
+   ══════════════════════════════════════ */
+const pwDefaults = [[0.15,0.35],[0.15,0.35],[0.15,0.35],[0.15,0.35]];
+const cpDefaults = [0.14, 0.00, 0.92, 0.40];
+
+function initPairWeights() {
+  const card = document.getElementById('pw_card');
+  let html = '';
+  PAIR_LABELS.forEach((lbl, i) => {
+    html += `<div class="slider-group">
+      <div class="label-row"><span>${lbl} range</span>
+        <span id="pw_val_${i}" class="range-val">[${pwDefaults[i][0].toFixed(2)}, ${pwDefaults[i][1].toFixed(2)}]</span></div>
+      <div class="range-row">
+        <input type="number" id="pw_lo_${i}" value="${pwDefaults[i][0]}" min="0" max="1" step="0.01"
+               oninput="updatePWDisplay(${i})">
+        <span style="color:var(--muted)">–</span>
+        <input type="number" id="pw_hi_${i}" value="${pwDefaults[i][1]}" min="0" max="1" step="0.01"
+               oninput="updatePWDisplay(${i})">
+      </div></div>`;
+  });
+  card.innerHTML = html;
+  checkFeasibility();
+}
+
+function updatePWDisplay(i) {
+  const lo = parseFloat(document.getElementById(`pw_lo_${i}`).value) || 0;
+  const hi = parseFloat(document.getElementById(`pw_hi_${i}`).value) || 0;
+  document.getElementById(`pw_val_${i}`).textContent = `[${lo.toFixed(2)}, ${hi.toFixed(2)}]`;
+  checkFeasibility();
+}
+
+function checkFeasibility() {
+  let loSum = 0, hiSum = 0;
+  for (let i = 0; i < 4; i++) {
+    loSum += parseFloat(document.getElementById(`pw_lo_${i}`).value) || 0;
+    hiSum += parseFloat(document.getElementById(`pw_hi_${i}`).value) || 0;
+  }
+  const el = document.getElementById('pw_feasibility');
+  if (loSum > 1.0)
+    el.innerHTML = `<div class="warning">⚠️ The minimum weights sum to ${loSum.toFixed(2)} (&gt; 1). Lower some minimums so a feasible solution exists.</div>`;
+  else if (hiSum < 1.0)
+    el.innerHTML = `<div class="warning">⚠️ The maximum weights only sum to ${hiSum.toFixed(2)} (&lt; 1). Raise some maximums so a feasible solution exists.</div>`;
+  else
+    el.innerHTML = `<div style="color:var(--accent2);font-size:0.88rem;">✓ Feasible — min‑sum ${loSum.toFixed(2)}, max‑sum ${hiSum.toFixed(2)}</div>`;
+}
+
+function initCondProbs() {
+  const grid = document.getElementById('cond_prob_grid');
+  let html = '';
+  PAIR_LABELS.forEach((lbl, i) => {
+    html += `<div class="card"><label>P(z=1 | ${lbl})</label>
+      <div class="range-row">
+        <input type="range" id="cp_${i}" min="0" max="1" step="0.01" value="${cpDefaults[i]}"
+               oninput="document.getElementById('cpv_${i}').textContent=this.value">
+        <span id="cpv_${i}" class="range-val">${cpDefaults[i]}</span>
+      </div></div>`;
+  });
+  grid.innerHTML = html;
+}
+
+document.getElementById('num_constraints').addEventListener('input', renderConstraints);
+function renderConstraints() {
+  const n = parseInt(document.getElementById('num_constraints').value) || 0;
+  const ct = document.getElementById('constraints_container');
+  let html = '';
+  for (let k = 0; k < n; k++) {
+    html += `<div class="constraint-block"><strong>Constraint ${k+1}</strong>
+      <div class="grid4" style="margin-top:8px;">
+        <div><label>var1</label><select id="ac_v1_${k}"><option value="0">0</option><option value="1">1</option></select></div>
+        <div><label>var2</label><select id="ac_v2_${k}"><option value="0">0</option><option value="1">1</option></select></div>
+        <div><label>predict z</label><select id="ac_pz_${k}"><option value="0">0</option><option value="1">1</option></select></div>
+        <div><label>target accuracy</label>
+          <div class="range-row">
+            <input type="range" id="ac_acc_${k}" min="0" max="1" step="0.01" value="0.75"
+                   oninput="document.getElementById('ac_accv_${k}').textContent=this.value">
+            <span id="ac_accv_${k}" class="range-val">0.75</span>
+          </div></div>
+      </div></div>`;
+  }
+  ct.innerHTML = html;
+}
+
+/* ── table builder ──────────────────── */
+function makeTable(headers, rows) {
+  let html = '<table><thead><tr>' + headers.map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  for (const row of rows)
+    html += '<tr>' + row.map(c=>`<td>${c}</td>`).join('') + '</tr>';
+  html += '</tbody></table>';
+  return html;
+}
+
+/* ══════════════════════════════════════
+   GENERATE
+   ══════════════════════════════════════ */
+function generate() {
+  const N = parseInt(document.getElementById('inp_N').value) || 28;
+
+  const pwRanges = [];
+  for (let i = 0; i < 4; i++) {
+    const lo = parseFloat(document.getElementById(`pw_lo_${i}`).value) || 0;
+    const hi = parseFloat(document.getElementById(`pw_hi_${i}`).value) || 0;
+    pwRanges.push([Math.min(lo,hi), Math.max(lo,hi)]);
+  }
+
+  const condProbs = [];
+  for (let i = 0; i < 4; i++)
+    condProbs.push(parseFloat(document.getElementById(`cp_${i}`).value) || 0);
+
+  const nC = parseInt(document.getElementById('num_constraints').value) || 0;
+  const accSpecs = [];
+  for (let k = 0; k < nC; k++) {
+    accSpecs.push({
+      var1: parseInt(document.getElementById(`ac_v1_${k}`).value),
+      var2: parseInt(document.getElementById(`ac_v2_${k}`).value),
+      pred_z: parseInt(document.getElementById(`ac_pz_${k}`).value),
+      target: parseFloat(document.getElementById(`ac_acc_${k}`).value)
+    });
+  }
+
+  const freq = solve(N, condProbs, pwRanges, accSpecs);
+  const data = buildData(freq);
+
+  // ── Frequency table ──
+  const freqHeaders = ['Row','var1','var2','outcome','freq'];
+  const freqRows = freq.map((f,i) => [`row ${i}`, CASE1[i][0], CASE1[i][1], CASE1[i][3], f]);
+  document.getElementById('freq_table_container').innerHTML = makeTable(freqHeaders, freqRows);
+  document.getElementById('freq_code').textContent = `freq = np.array([${freq.join(', ')}])`;
+
+  // ── Empirical table ──
+  const pairKeys = ['0,0','0,1','1,1','1,0'];
+  const empHeaders = ['(var1,var2)','n_pair','Weight range','Empirical weight','Target P(z=1|·)','Empirical P(z=1|·)'];
+  const empRows = PAIRS.map((p,i) => {
+    const [r0,r1] = PAIR_IDX[pairKeys[i]];
+    const np_ = freq[r0]+freq[r1];
+    const empP = np_>0 ? (freq[r1]/np_).toFixed(4) : '—';
+    const empW = (np_/N).toFixed(4);
+    return [`(${p[0]},${p[1]})`, np_, `[${pwRanges[i][0].toFixed(2)}, ${pwRanges[i][1].toFixed(2)}]`,
+            empW, condProbs[i].toFixed(2), empP];
+  });
+  document.getElementById('emp_table_container').innerHTML = makeTable(empHeaders, empRows);
+
+  // ── All rules ──
+  const rules = allRules(data);
+  const rHeaders = ['#','Rule','Accuracy'];
+  const rRows = rules.map((r,i) => [i+1, r.name, isNaN(r.acc)?'—':r.acc.toFixed(4)]);
+  document.getElementById('rules_table_container').innerHTML = makeTable(rHeaders, rRows);
+
+  // ── Constraint check ──
+  const ccCt = document.getElementById('constraint_check_container');
+  if (accSpecs.length) {
+    const ccHeaders = ['Rule','Target Accuracy','Empirical Accuracy','Δ'];
+    const ccRows = accSpecs.map(spec => {
+      const predFn = r => (r.x1===spec.var1 && r.x2===spec.var2) ? spec.pred_z : 1-spec.pred_z;
+      const acc = accuracy(data, predFn);
+      return [
+        `var1=${spec.var1}, var2=${spec.var2} → z=${spec.pred_z}`,
+        (spec.target*100).toFixed(1)+'%',
+        isNaN(acc) ? '—' : (acc*100).toFixed(1)+'%',
+        isNaN(acc) ? '—' : Math.abs(acc-spec.target).toFixed(4)
+      ];
+    });
+    ccCt.innerHTML = '<h3>Constrained‑Rule Check</h3>' + makeTable(ccHeaders, ccRows);
+  } else {
+    ccCt.innerHTML = '';
+  }
+
+  // ── Unconditional metric ──
+  const uncond = data.length > 0 ? data.filter(r=>r.z===1).length / data.length : 0;
+  document.getElementById('uncond_metric').innerHTML =
+    `<div class="metric"><div class="lbl">Unconditional accuracy (predict z=1 always)</div>
+     <div class="val">${uncond.toFixed(4)}</div></div>`;
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ── init ── */
+initPairWeights();
+initCondProbs();
+renderConstraints();
+</script>
+</body>
+</html>
