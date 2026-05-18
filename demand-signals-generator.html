@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demand Signal Generator</title>
+    <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        background: #f5f7fa;
+        color: #333;
+        line-height: 1.5;
+        padding: 12px;
+    }
+    .container {
+        max-width: 920px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        padding: 22px 28px;
+    }
+    h1 { text-align: center; color: #2c3e50; margin-bottom: 8px; font-size: 1.5rem; }
+    h2 { color: #34495e; margin: 18px 0 10px; font-size: 1.05rem; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
+
+    /* Collapsible description */
+    .description-toggle { max-width: 720px; margin: 0 auto 14px; text-align: center; }
+    .desc-btn {
+        background: none; border: 1px solid #dfe6e9; border-radius: 6px;
+        padding: 6px 16px; font-size: 0.85rem; color: #636e72; cursor: pointer;
+        transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .desc-btn:hover { background: #f8f9fa; color: #2c3e50; border-color: #b2bec3; }
+    .desc-arrow { font-size: 0.65rem; transition: transform 0.2s; display: inline-block; }
+    .description-toggle.open .desc-arrow { transform: rotate(90deg); }
+    .desc-content { display: none; text-align: left; margin-top: 10px; }
+    .description-toggle.open .desc-content { display: block; }
+    .desc-content p { font-size: 0.85rem; color: #8a96a3; line-height: 1.5; margin-bottom: 6px; }
+
+    /* Form */
+    .form-section { background: #fafbfc; border-radius: 8px; padding: 14px 18px; border: 1px solid #e1e8ed; }
+    .form-row { display: flex; gap: 16px; margin-bottom: 10px; align-items: flex-start; flex-wrap: wrap; }
+    .form-row.sep { border-top: 1px solid #e9ecef; padding-top: 10px; margin-top: 2px; }
+    .form-group { display: flex; flex-direction: column; min-width: 140px; }
+    .form-group > label { font-weight: 600; font-size: 0.82rem; color: #555; margin-bottom: 3px; }
+    .form-group input[type="number"],
+    .form-group input[type="text"],
+    .form-group select {
+        padding: 6px 10px; border: 1px solid #ddd; border-radius: 5px;
+        font-size: 0.88rem; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus {
+        outline: none; border-color: #3498db;
+        box-shadow: 0 0 0 2px rgba(52,152,219,0.12);
+    }
+    .inline-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
+    .inline-row label { font-size: 0.82rem; color: #555; display: flex; align-items: center; gap: 4px; }
+    .inline-row input[type="number"] {
+        width: 68px; padding: 5px 8px; border: 1px solid #ddd;
+        border-radius: 5px; font-size: 0.85rem;
+    }
+    .inline-row input:focus { outline: none; border-color: #3498db; box-shadow: 0 0 0 2px rgba(52,152,219,0.12); }
+    .radio-group { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+    .radio-group label { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .seed-inline { min-width: 120px; }
+    .seed-inline input { width: 110px; font-size: 0.85rem; color: #999; }
+
+    /* Buttons */
+    .button-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    button {
+        padding: 8px 16px; border: none; border-radius: 5px; font-size: 0.88rem;
+        font-weight: 500; cursor: pointer; transition: all 0.2s;
+        background: #ecf0f1; color: #2c3e50;
+    }
+    button:hover { background: #bdc3c7; }
+    button:active { transform: translateY(1px); }
+    button.primary { background: #3498db; color: #fff; }
+    button.primary:hover { background: #2980b9; }
+    button.success-btn { background: #27ae60; color: #fff; }
+    button.success-btn:hover { background: #219a52; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Output */
+    .output-section { margin-top: 20px; }
+    .hidden { display: none !important; }
+
+    /* Status badge */
+    .status-badge {
+        padding: 10px 16px; border-radius: 7px; font-size: 0.93rem; font-weight: 600;
+        margin-bottom: 8px; display: flex; flex-direction: column; gap: 5px;
+    }
+    .status-badge.good { background: #d5f5e3; color: #1e8449; border: 1px solid #82e0aa; }
+    .status-badge.bad  { background: #fdebd0; color: #935116; border: 1px solid #f0b27a; }
+    .status-reasons { font-size: 0.81rem; font-weight: 400; line-height: 1.5; }
+
+    /* Stats grids */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+    .stat-card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 7px; padding: 8px 10px; text-align: center; }
+    .stat-card .label { font-size: 0.68rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 1.05rem; font-weight: 700; color: #2c3e50; margin-top: 2px; }
+    .stat-card.hi   { background: #eaf4fb; border-color: #aed6f1; }
+    .stat-card.hi .value { color: #1a5276; }
+    .stat-card.ok   { background: #d5f5e3; border-color: #82e0aa; }
+    .stat-card.ok .value { color: #1e8449; }
+    .stat-card.fail { background: #fdebd0; border-color: #f0b27a; }
+    .stat-card.fail .value { color: #935116; }
+
+    /* Chart */
+    .chart-wrapper {
+        background: #fafbfc; border: 1px solid #e1e8ed; border-radius: 7px;
+        padding: 10px 10px 6px; margin-bottom: 4px;
+    }
+    #chart_canvas { display: block; max-width: 100%; }
+    .chart-legend {
+        display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: #555;
+        margin-top: 8px; padding-top: 6px; border-top: 1px solid #e9ecef;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-swatch { width: 22px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    /* Table */
+    .table-container { overflow-x: auto; border-radius: 7px; border: 1px solid #e1e8ed; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    thead { background: #34495e; color: #fff; }
+    th, td { padding: 7px 10px; text-align: center; }
+    th { font-weight: 600; text-transform: uppercase; font-size: 0.71rem; letter-spacing: 0.4px; }
+    td:first-child { font-weight: 600; color: #555; }
+    tbody tr:nth-child(even) { background: #f8f9fa; }
+    tbody tr:hover { background: #e8f4f8; }
+    td { border-bottom: 1px solid #e9ecef; }
+    td.ok-cell   { color: #1e8449; font-weight: 700; }
+    td.fail-cell { color: #c0392b; }
+    tr.milestone td { background: #fffaeb !important; }
+    tr.milestone td:first-child { color: #856404; }
+
+    /* Progress message */
+    .prog-msg { font-size: 0.84rem; color: #888; margin-top: 8px; font-style: italic; }
+
+    /* Top-10 cards */
+    .top10-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 12px; margin-top: 8px; }
+    .top10-card {
+        background: #fafbfc; border: 1px solid #e1e8ed; border-radius: 8px;
+        padding: 12px 14px; transition: box-shadow 0.2s;
+    }
+    .top10-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .top10-card.passes { border-color: #82e0aa; background: #f9fff9; }
+    .top10-rank  { font-size: 0.71rem; font-weight: 700; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+    .top10-d     { font-size: 1.1rem; font-weight: 700; color: #2c3e50; margin-bottom: 4px; }
+    .top10-meta  { font-size: 0.78rem; color: #666; margin-bottom: 4px; line-height: 1.5; }
+    .top10-use   { font-size: 0.82rem; padding: 5px 12px; margin-top: 6px; }
+
+    @media (max-width: 600px) {
+        .container { padding: 12px; }
+        .form-row { flex-direction: column; gap: 10px; }
+        .form-group { width: 100%; }
+        .button-row { flex-direction: column; }
+        button { width: 100%; }
+    }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Demand Signal Generator</h1>
+
+    <div class="description-toggle">
+        <button class="desc-btn" onclick="this.parentElement.classList.toggle('open')">
+            <span class="desc-arrow">▶</span> What is this?
+        </button>
+        <div class="desc-content">
+            <p>This tool generates one round of demand indicators for a supply chain experiment. Participants (supply chain managers) observe up to N noisy demand signals and choose an inventory level. Each indicator is drawn from Normal(D, σ²), where D is the true demand. Their plan succeeds if the cumulative average of observed signals falls within a coverage level δ of D.</p>
+            <p><strong>Generate one sequence</strong> draws a single random (or seeded) sequence. <strong>Generate until constraints met</strong> keeps trying until the sequence satisfies the default difficulty constraints. <strong>Top 10 from 1000 candidates</strong> evaluates 1 000 sequences and returns the best-scoring ones. Milestone rows at n = 5, 8, 10, 12, 16 are highlighted in the table.</p>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <!-- Row 1: D, sigma, N -->
+        <div class="form-row">
+            <div class="form-group">
+                <label>True Demand D</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="d_mode" id="d_rand" value="random" checked> Random</label>
+                    <label><input type="radio" name="d_mode" id="d_man"  value="manual"> Manual:</label>
+                    <input type="number" id="d_manual_val" value="60" min="0" step="1" style="width:68px">
+                </div>
+            </div>
+            <div class="form-group" id="d_range_grp">
+                <label>D range (random)</label>
+                <div class="inline-row">
+                    <label>Min <input type="number" id="d_min" value="20" min="0" step="1"></label>
+                    <label>Max <input type="number" id="d_max" value="100" min="0" step="1"></label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Sigma (σ)</label>
+                <input type="number" id="sigma" value="18" min="0.1" step="0.5">
+            </div>
+            <div class="form-group">
+                <label>N indicators</label>
+                <input type="number" id="n_ind" value="20" min="3" max="50">
+            </div>
+        </div>
+
+        <!-- Row 2: coverage levels, plausibility range, seed -->
+        <div class="form-row sep">
+            <div class="form-group">
+                <label>Coverage levels (δ₁, δ₂, δ₃)</label>
+                <div class="inline-row">
+                    <input type="number" id="delta1" value="2"  min="0.1" step="0.5" style="width:60px">
+                    <input type="number" id="delta2" value="4"  min="0.1" step="0.5" style="width:60px">
+                    <input type="number" id="delta3" value="8"  min="0.1" step="0.5" style="width:60px">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Indicator plausibility range</label>
+                <div class="inline-row">
+                    <label>Min <input type="number" id="z_min" value="0"   step="1" style="width:65px"></label>
+                    <label>Max <input type="number" id="z_max" value="140" step="1" style="width:65px"></label>
+                </div>
+            </div>
+            <div class="form-group seed-inline">
+                <label>Seed <span style="font-weight:400;color:#aaa">(optional)</span></label>
+                <input type="text" id="seed" placeholder="e.g. 12345">
+            </div>
+        </div>
+
+        <!-- Row 3: extra constraints -->
+        <div class="form-row" style="border-top: 1px solid #e9ecef; padding-top: 10px; margin-top: 2px;">
+            <div class="form-group" style="min-width:unset">
+                <label>Extra constraints</label>
+                <label style="font-size:0.85rem;color:#555;font-weight:400;display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer">
+                    <input type="checkbox" id="req_small_n10">
+                    Small coverage (δ₁) succeeds at n = 10
+                </label>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button id="btn_one"   class="primary">Generate one sequence</button>
+            <button id="btn_until">Generate until constraints met</button>
+            <button id="btn_top10">Top 10 from 1000 candidates</button>
+        </div>
+        <div id="prog_msg" class="prog-msg hidden"></div>
+    </div>
+
+    <!-- ── Main output ── -->
+    <div id="out_main" class="output-section hidden">
+        <div id="status_badge" class="status-badge"></div>
+
+        <h2>Parameters</h2>
+        <div id="grid_params" class="stats-grid"></div>
+
+        <h2>Summary Diagnostics</h2>
+        <div id="grid_diag" class="stats-grid"></div>
+
+        <h2>Cumulative Average vs. True Demand</h2>
+        <div class="chart-wrapper">
+            <canvas id="chart_canvas" width="840" height="240"></canvas>
+            <div id="chart_legend" class="chart-legend"></div>
+        </div>
+
+        <h2>Indicator Table</h2>
+        <div class="table-container">
+            <table>
+                <thead id="tbl_head"></thead>
+                <tbody id="tbl_body"></tbody>
+            </table>
+        </div>
+
+        <div class="button-row">
+            <button id="btn_copy_csv">Copy indicators as CSV</button>
+            <button id="btn_dl_csv">Download full CSV</button>
+        </div>
+    </div>
+
+    <!-- ── Top-10 output ── -->
+    <div id="out_top10" class="output-section hidden">
+        <h2>Top 10 Sequences <span id="top10_sub" style="font-size:0.85rem;font-weight:400;color:#888"></span></h2>
+        <div id="top10_grid" class="top10-grid"></div>
+    </div>
+</div>
+
+<script>
+/* ============================================================
+   PRNG — Mulberry32 (same algorithm as knapsack-generator)
+   ============================================================ */
+function mulberry32(seed) {
+    return function () {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+function hashSeed(s) {
+    if (typeof s === 'number') return Math.abs(Math.floor(s));
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h, 33) ^ s.charCodeAt(i);
+    return h >>> 0;
+}
+
+// Box-Muller: samples one N(0,1) variate using two uniform draws.
+function boxMuller(rng) {
+    const u1 = Math.max(rng(), 1e-12);
+    const u2 = rng();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/* ============================================================
+   Data-generating logic
+   ============================================================ */
+
+// Returns { D, indicators: number[], seed: string }
+function generateSequence(config, seedStr) {
+    const rng = seedStr ? mulberry32(hashSeed(seedStr)) : null;
+    const rand = rng || (() => Math.random());
+
+    const D = (config.manualD !== null)
+        ? config.manualD
+        : config.dMin + rand() * (config.dMax - config.dMin);
+
+    const indicators = [];
+    for (let i = 0; i < config.nInd; i++) {
+        indicators.push(D + config.sigma * boxMuller(rand));
+    }
+    return { D, indicators, seed: seedStr || '' };
+}
+
+// Returns one row per n: { n, z, avg, dist, s<delta>: 0|1, ... }
+function computeDiagnostics(D, indicators, deltas) {
+    let sum = 0;
+    return indicators.map((z, i) => {
+        sum += z;
+        const n   = i + 1;
+        const avg = sum / n;
+        const dist = Math.abs(avg - D);
+        const row = { n, z, avg, dist };
+        for (const d of deltas) row[`s${d}`] = dist <= d ? 1 : 0;
+        return row;
+    });
+}
+
+// Returns { pass, failures: string[], warnings: string[] }
+function checkConstraints(rows, indicators, config) {
+    const g   = n => rows.find(r => r.n === n) || null;
+    const failures = [], warnings = [];
+
+    const r1  = g(1),  r2  = g(2),  r5  = g(5),  r8  = g(8);
+    const r10 = g(10), r12 = g(12), r16 = g(16);
+    const rN  = rows[rows.length - 1];
+
+    // ── Medium coverage (δ = δ₂, default 4) ──
+    const dm = config.deltas[1];  // medium delta
+    if (r5  && r5.dist  <= dm) failures.push(`dist₅ = ${r5.dist.toFixed(1)} ≤ ${dm} — medium coverage should fail at n=5`);
+    if (r12 && r16 && r12.dist > dm && r16.dist > dm)
+        failures.push(`dist₁₂=${r12.dist.toFixed(1)}, dist₁₆=${r16.dist.toFixed(1)} — medium should succeed by n=12 or n=16`);
+    if (r8 && !(r8.dist > dm || (r8.dist >= dm - 1 && r8.dist <= dm + 1)))
+        warnings.push(`dist₈ = ${r8.dist.toFixed(1)} — prefer dist₈ > ${dm} or near boundary [${dm-1}, ${dm+1}]`);
+
+    // ── Small coverage (δ = δ₁, default 2) ──
+    const ds = config.deltas[0];  // small delta
+    if (r5  && r5.dist  <= ds) failures.push(`dist₅ = ${r5.dist.toFixed(1)} ≤ ${ds} — small coverage should fail at n=5`);
+    if (r8  && r8.dist  <= ds) failures.push(`dist₈ = ${r8.dist.toFixed(1)} ≤ ${ds} — small coverage should fail at n=8`);
+    if (r10 && r10.dist <= ds) warnings.push(`dist₁₀ = ${r10.dist.toFixed(1)} ≤ ${ds} — small coverage ideally also fails at n=10`);
+
+    // ── Large coverage (δ = δ₃, default 8) ──
+    const dl = config.deltas[2];  // large delta
+    if (r1 && r2 && r1.dist <= dl && r2.dist <= dl)
+        failures.push(`dist₁=${r1.dist.toFixed(1)}, dist₂=${r2.dist.toFixed(1)} — large coverage trivially succeeds at n=1 and n=2`);
+    if (r8 && r10 && r8.dist > dl && r10.dist > dl)
+        failures.push(`dist₈=${r8.dist.toFixed(1)}, dist₁₀=${r10.dist.toFixed(1)} — large coverage should succeed by n=8 or n=10`);
+
+    // ── Optional: small coverage must succeed at n=10 ──
+    if (config.reqSmallN10 && r10 && r10.dist > ds)
+        failures.push(`dist₁₀ = ${r10.dist.toFixed(1)} > ${ds} — small coverage (δ=${ds}) required to succeed at n=10`);
+
+    // ── Extreme indicators ──
+    const extreme = indicators.filter(z => z < config.zMin || z > config.zMax);
+    if (extreme.length > 0)
+        failures.push(`${extreme.length} indicator(s) outside [${config.zMin}, ${config.zMax}]`);
+
+    // ── Sequence doesn't converge ──
+    if (rN && rN.dist > dl)
+        failures.push(`dist at n=${rN.n} = ${rN.dist.toFixed(1)} > ${dl} — sequence hasn't converged by the end`);
+
+    return { pass: failures.length === 0, failures, warnings };
+}
+
+// Higher score = better candidate for top-10 ranking.
+function scoreSequence(rows, indicators, config) {
+    const g = n => rows.find(r => r.n === n) || null;
+    let score = 0;
+
+    const ds = config.deltas[0], dm = config.deltas[1], dl = config.deltas[2];
+    const r1=g(1), r2=g(2), r5=g(5), r8=g(8), r10=g(10), r12=g(12), r16=g(16);
+    const rN = rows[rows.length - 1];
+
+    // dist₅ > dm (medium fails early)
+    if (r5) score += r5.dist > dm ? 25 : Math.max(0, r5.dist * 4);
+
+    // dist₈ near dm (Gaussian-shaped reward)
+    if (r8) {
+        const d8 = r8.dist;
+        if      (d8 >= dm-1 && d8 <= dm+1) score += 20;
+        else if (d8 >= dm-2 && d8 <= dm+2) score += 10;
+        else if (d8 > dm)                   score += 5;
+    }
+
+    // medium succeeds by n=12 or n=16
+    if ((r12 && r12.dist <= dm) || (r16 && r16.dist <= dm)) score += 20;
+
+    // small coverage fails at n=5 and n=8
+    if (r5  && r5.dist  > ds) score += 10;
+    if (r8  && r8.dist  > ds) score += 10;
+
+    // large not trivially easy at n=1 or n=2
+    if ((r1 && r1.dist > dl) || (r2 && r2.dist > dl)) score += 8;
+
+    // large succeeds by n=8 or n=10
+    if ((r8 && r8.dist <= dl) || (r10 && r10.dist <= dl)) score += 12;
+
+    // optional constraint: small coverage succeeds at n=10
+    if (config.reqSmallN10 && r10) score += r10.dist <= ds ? 30 : -30;
+
+    // reward declining distance trend (negative regression slope)
+    const meanN = (rows.length + 1) / 2;
+    const meanD = rows.reduce((s, r) => s + r.dist, 0) / rows.length;
+    let cov = 0, varN = 0;
+    for (const r of rows) { cov += (r.n - meanN)*(r.dist - meanD); varN += (r.n - meanN)**2; }
+    const slope = varN > 0 ? cov / varN : 0;
+    score += Math.max(0, -slope * 15);
+
+    // penalties
+    const extreme = indicators.filter(z => z < config.zMin || z > config.zMax).length;
+    score -= extreme * 30;
+    if (rN && rN.dist > dl) score -= 20;
+
+    // large bonus for passing all hard constraints
+    const chk = checkConstraints(rows, indicators, config);
+    if (chk.pass) score += 50;
+
+    return score;
+}
+
+/* ============================================================
+   Chart rendering (pure Canvas 2D, no dependencies)
+   ============================================================ */
+function drawChart(D, rows, deltas, canvas) {
+    const W = canvas.width, H = canvas.height;
+    const P = { t: 18, r: 54, b: 38, l: 52 };
+    const pw = W - P.l - P.r, ph = H - P.t - P.b;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    const avgs = rows.map(r => r.avg);
+    const zs   = rows.map(r => r.z);
+    const dl   = Math.max(...deltas);
+    // Include individual indicator values in the Y range so dots stay visible
+    const allY = [...avgs, ...zs, D + dl, D - dl];
+    const pad  = (Math.max(...allY) - Math.min(...allY)) * 0.12 + 1;
+    const yLo  = Math.min(...allY) - pad;
+    const yHi  = Math.max(...allY) + pad;
+
+    const xOf = n => P.l + (n - 1) / (rows.length - 1) * pw;
+    const yOf = v => P.t + ph - (v - yLo) / (yHi - yLo) * ph;
+
+    // Coverage bands: largest first so smaller overlays it
+    const sortedD = [...deltas].sort((a, b) => b - a);
+    const alphas  = [0.12, 0.22, 0.40];
+    sortedD.forEach((d, i) => {
+        ctx.fillStyle = `rgba(39,174,96,${alphas[i]})`;
+        ctx.fillRect(P.l, yOf(D + d), pw, yOf(D - d) - yOf(D + d));
+    });
+
+    // Faint horizontal grid
+    ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) {
+        const y = yOf(yLo + i / 5 * (yHi - yLo));
+        ctx.beginPath(); ctx.moveTo(P.l, y); ctx.lineTo(P.l + pw, y); ctx.stroke();
+    }
+
+    // True D line (dashed red)
+    ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(P.l, yOf(D)); ctx.lineTo(P.l + pw, yOf(D)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Axes
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(P.l, P.t); ctx.lineTo(P.l, P.t + ph); ctx.lineTo(P.l + pw, P.t + ph);
+    ctx.stroke();
+
+    // Y-axis labels
+    ctx.fillStyle = '#666'; ctx.font = '11px system-ui,sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 5; i++) {
+        const v = yLo + i / 5 * (yHi - yLo);
+        ctx.fillText(v.toFixed(0), P.l - 6, yOf(v));
+    }
+
+    // X-axis labels
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#666';
+    for (let n = 1; n <= rows.length; n++) {
+        if (rows.length <= 20 || n === 1 || n % 2 === 0)
+            ctx.fillText(n, xOf(n), P.t + ph + 5);
+    }
+    ctx.fillStyle = '#aaa'; ctx.font = '10px system-ui,sans-serif';
+    ctx.fillText('n (indicators observed)', P.l + pw / 2, P.t + ph + 22);
+
+    // Milestone vertical guides
+    const milestones = [5, 8, 10, 12, 16];
+    ctx.strokeStyle = 'rgba(120,120,120,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    milestones.forEach(n => {
+        if (n <= rows.length) {
+            ctx.beginPath(); ctx.moveTo(xOf(n), P.t); ctx.lineTo(xOf(n), P.t + ph); ctx.stroke();
+        }
+    });
+    ctx.setLineDash([]);
+
+    // Small dots for realized indicator values z_n (drawn first, behind the avg line)
+    rows.forEach(r => {
+        ctx.fillStyle = 'rgba(200, 100, 40, 0.55)';
+        ctx.beginPath(); ctx.arc(xOf(r.n), yOf(r.z), 2.2, 0, 2*Math.PI); ctx.fill();
+    });
+
+    // Cumulative average line
+    ctx.strokeStyle = '#2980b9'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    rows.forEach((r, i) => {
+        i === 0 ? ctx.moveTo(xOf(r.n), yOf(r.avg)) : ctx.lineTo(xOf(r.n), yOf(r.avg));
+    });
+    ctx.stroke();
+
+    // Dots on cumulative average (larger at milestones)
+    rows.forEach(r => {
+        const ms = milestones.includes(r.n);
+        ctx.fillStyle = ms ? '#1a5276' : '#2980b9';
+        ctx.beginPath(); ctx.arc(xOf(r.n), yOf(r.avg), ms ? 4.5 : 2.8, 0, 2*Math.PI); ctx.fill();
+    });
+
+    // D label on right margin
+    ctx.fillStyle = '#e74c3c'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '11px system-ui,sans-serif';
+    ctx.fillText(`D=${D.toFixed(1)}`, P.l + pw + 4, yOf(D));
+}
+
+/* ============================================================
+   UI render helpers
+   ============================================================ */
+function card(label, value, cls) {
+    return `<div class="stat-card ${cls||''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function renderParams(seq, config) {
+    document.getElementById('grid_params').innerHTML = [
+        card('True Demand D',  seq.D.toFixed(1), 'hi'),
+        card('D (rounded)',    Math.round(seq.D), ''),
+        card('Sigma (σ)',      config.sigma,      ''),
+        card('N indicators',   config.nInd,       ''),
+        card('Seed used',      seq.seed || 'random', ''),
+    ].join('');
+}
+
+function renderDiagnostics(seq, rows, config) {
+    const g = n => rows.find(r => r.n === n);
+    const { deltas, zMin, zMax } = config;
+    const items = [];
+
+    // First n at which each coverage level succeeds
+    for (const d of deltas) {
+        const row = rows.find(r => r[`s${d}`] === 1);
+        const val = row ? row.n : '—';
+        items.push(card(`First success δ=${d}`, val, row ? 'ok' : 'fail'));
+    }
+
+    // Average distance n=5..16
+    const mid = rows.filter(r => r.n >= 5 && r.n <= 16);
+    if (mid.length > 0) {
+        const avg = mid.reduce((s, r) => s + r.dist, 0) / mid.length;
+        items.push(card('Avg dist n=5–16', avg.toFixed(1), ''));
+    }
+
+    // Min / max indicator
+    const minZ = Math.min(...seq.indicators);
+    const maxZ = Math.max(...seq.indicators);
+    items.push(card('Min indicator', minZ.toFixed(1), minZ < zMin ? 'fail' : ''));
+    items.push(card('Max indicator', maxZ.toFixed(1), maxZ > zMax ? 'fail' : ''));
+
+    // Success at key n values for each delta
+    const keyNs = [...new Set([5, 8, 10, 12, 16, rows.length])].filter(n => n <= rows.length);
+    for (const n of keyNs) {
+        const row = g(n); if (!row) continue;
+        for (const d of deltas) {
+            const ok = row[`s${d}`] === 1;
+            items.push(card(`n=${n}, δ=${d}`, ok ? '✓' : '✗', ok ? 'ok' : 'fail'));
+        }
+    }
+
+    document.getElementById('grid_diag').innerHTML = items.join('');
+}
+
+function renderTable(rows, config) {
+    const { deltas } = config;
+    const milestones = new Set([5, 8, 10, 12, 16]);
+
+    // Build thead dynamically to match current coverage levels
+    const deltaCols = deltas.map(d => `<th>δ=${d}</th>`).join('');
+    document.getElementById('tbl_head').innerHTML =
+        `<tr><th>n</th><th>z_n</th><th>z_n (int)</th>`
+        + `<th>Cum. avg</th><th>|avg−D|</th>${deltaCols}</tr>`;
+
+    document.getElementById('tbl_body').innerHTML = rows.map(r => {
+        const ms = milestones.has(r.n) ? ' class="milestone"' : '';
+        const dcells = deltas.map(d => {
+            const ok = r[`s${d}`] === 1;
+            return `<td class="${ok ? 'ok-cell' : 'fail-cell'}">${ok ? '✓' : '✗'}</td>`;
+        }).join('');
+        return `<tr${ms}><td>${r.n}</td><td>${r.z.toFixed(1)}</td>`
+             + `<td>${Math.round(r.z)}</td><td>${r.avg.toFixed(1)}</td><td>${r.dist.toFixed(1)}</td>`
+             + `${dcells}</tr>`;
+    }).join('');
+}
+
+function renderLegend(deltas) {
+    const bandColors = [
+        'rgba(39,174,96,0.12)', 'rgba(39,174,96,0.28)', 'rgba(39,174,96,0.50)',
+    ];
+    const sorted = [...deltas].sort((a,b) => b-a);
+    const items = sorted.map((d, i) =>
+        `<div class="legend-item">
+            <div class="legend-swatch" style="background:${bandColors[i]};border:1px solid rgba(39,174,96,0.5)"></div>
+            δ = ${d}
+        </div>`
+    );
+    items.push(`<div class="legend-item"><div class="legend-swatch" style="background:#e74c3c;height:2px;margin-top:4px;border-radius:1px"></div> True D</div>`);
+    items.push(`<div class="legend-item"><div class="legend-swatch" style="background:#2980b9;height:2px;margin-top:4px;border-radius:1px"></div> Cum. avg</div>`);
+    items.push(`<div class="legend-item"><div style="width:8px;height:8px;border-radius:50%;background:rgba(200,100,40,0.55);flex-shrink:0"></div> Indicator z_n</div>`);
+    document.getElementById('chart_legend').innerHTML = items.join('');
+}
+
+function renderStatus(check) {
+    const el = document.getElementById('status_badge');
+    if (check.pass) {
+        el.className = 'status-badge good';
+        el.innerHTML = '<span>✓ Good sequence — satisfies all difficulty constraints</span>'
+            + (check.warnings.length
+                ? `<div class="status-reasons">Soft warnings: ${check.warnings.join('; ')}</div>`
+                : '');
+    } else {
+        el.className = 'status-badge bad';
+        el.innerHTML = `<span>✗ Does not satisfy all constraints</span>`
+            + `<div class="status-reasons">Issues: ${check.failures.join('; ')}</div>`
+            + (check.warnings.length
+                ? `<div class="status-reasons">Warnings: ${check.warnings.join('; ')}</div>`
+                : '');
+    }
+}
+
+/* ============================================================
+   Export
+   ============================================================ */
+function buildCSV(seq, rows, config) {
+    const header = ['n','z_raw','z_1dp','z_int','cum_avg','dist',
+        ...config.deltas.map(d => `success_d${d}`)].join(',');
+    const lines = rows.map(r =>
+        [r.n, r.z.toFixed(4), r.z.toFixed(1), Math.round(r.z),
+         r.avg.toFixed(4), r.dist.toFixed(4),
+         ...config.deltas.map(d => r[`s${d}`])].join(',')
+    );
+    return `# true_demand,${seq.D.toFixed(4)}\n# sigma,${config.sigma}\n# seed,${seq.seed}\n`
+         + header + '\n' + lines.join('\n');
+}
+
+function downloadFile(content, filename, mime) {
+    const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(new Blob([content], { type: mime })),
+        download: filename
+    });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function copyText(text, btn) {
+    const orig = btn.textContent;
+    const ok  = () => { btn.textContent = 'Copied!';  setTimeout(() => btn.textContent = orig, 1500); };
+    const bad = () => { btn.textContent = 'Failed';   setTimeout(() => btn.textContent = orig, 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(ok).catch(bad);
+    } else {
+        const ta = Object.assign(document.createElement('textarea'),
+            { value: text, style: 'position:fixed;left:-9999px' });
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy') ? ok() : bad(); } catch { bad(); }
+        document.body.removeChild(ta);
+    }
+}
+
+/* ============================================================
+   State & orchestration
+   ============================================================ */
+let _seq = null, _rows = null, _cfg = null;
+
+function getConfig() {
+    const deltas = [
+        parseFloat(document.getElementById('delta1').value),
+        parseFloat(document.getElementById('delta2').value),
+        parseFloat(document.getElementById('delta3').value),
+    ].filter(d => !isNaN(d) && d > 0).sort((a, b) => a - b);
+
+    return {
+        manualD: document.getElementById('d_rand').checked ? null
+               : parseFloat(document.getElementById('d_manual_val').value),
+        dMin:  parseFloat(document.getElementById('d_min').value),
+        dMax:  parseFloat(document.getElementById('d_max').value),
+        sigma: parseFloat(document.getElementById('sigma').value),
+        nInd:  parseInt(document.getElementById('n_ind').value),
+        deltas,
+        zMin:          parseFloat(document.getElementById('z_min').value),
+        zMax:          parseFloat(document.getElementById('z_max').value),
+        seed:          document.getElementById('seed').value.trim(),
+        reqSmallN10:   document.getElementById('req_small_n10').checked,
+    };
+}
+
+function displayResult(seq, rows, config) {
+    _seq = seq; _rows = rows; _cfg = config;
+    const chk = checkConstraints(rows, seq.indicators, config);
+    renderStatus(chk);
+    renderParams(seq, config);
+    renderDiagnostics(seq, rows, config);
+    renderLegend(config.deltas);
+    renderTable(rows, config);
+    drawChart(seq.D, rows, config.deltas, document.getElementById('chart_canvas'));
+    document.getElementById('out_main').classList.remove('hidden');
+}
+
+function showMsg(text) {
+    const el = document.getElementById('prog_msg');
+    if (text === null) { el.classList.add('hidden'); return; }
+    el.textContent = text; el.classList.remove('hidden');
+}
+
+// ── Generate one ──
+function doOne() {
+    const cfg = getConfig();
+    const seed = cfg.seed || String(Date.now() ^ Math.floor(Math.random() * 1e9));
+    const seq  = generateSequence(cfg, seed);
+    displayResult(seq, computeDiagnostics(seq.D, seq.indicators, cfg.deltas), cfg);
+}
+
+// ── Generate until constraints met (batched to keep UI responsive) ──
+function doUntil() {
+    const cfg = getConfig();
+    const MAX = 5000, BATCH = 200;
+    const base = cfg.seed || String(Math.floor(Math.random() * 1e9));
+    let attempt = 0, found = null;
+    let bestScore = -Infinity, bestEntry = null;
+
+    showMsg('Searching…');
+
+    function run() {
+        for (let i = 0; i < BATCH && attempt < MAX; i++, attempt++) {
+            const seed = attempt === 0 ? base : `${base}_${attempt}`;
+            const seq  = generateSequence(cfg, seed);
+            const rows = computeDiagnostics(seq.D, seq.indicators, cfg.deltas);
+            const chk  = checkConstraints(rows, seq.indicators, cfg);
+            const sc   = scoreSequence(rows, seq.indicators, cfg);
+            if (sc > bestScore) { bestScore = sc; bestEntry = { seq, rows }; }
+            if (chk.pass)       { found = { seq, rows }; break; }
+        }
+
+        if (found) {
+            showMsg(`Found a good sequence after ${attempt} attempt(s).`);
+            setTimeout(() => showMsg(null), 3000);
+            displayResult(found.seq, found.rows, cfg);
+        } else if (attempt >= MAX) {
+            showMsg(`No fully-satisfying sequence in ${MAX} attempts. Showing best candidate (score ${bestScore.toFixed(0)}).`);
+            displayResult(bestEntry.seq, bestEntry.rows, cfg);
+        } else {
+            showMsg(`Searching… ${attempt} attempts so far.`);
+            setTimeout(run, 0);
+        }
+    }
+
+    setTimeout(run, 10);
+}
+
+// ── Top 10 from 1000 candidates (batched) ──
+function doTop10() {
+    const cfg = getConfig();
+    const N = 1000, BATCH = 100;
+    const base = cfg.seed || String(Math.floor(Math.random() * 1e9));
+    const scored = [];
+    let attempt = 0;
+
+    showMsg('Evaluating 1000 candidates…');
+
+    function run() {
+        for (let i = 0; i < BATCH && attempt < N; i++, attempt++) {
+            const seq  = generateSequence(cfg, `${base}_${attempt}`);
+            const rows = computeDiagnostics(seq.D, seq.indicators, cfg.deltas);
+            scored.push({ seq, rows, score: scoreSequence(rows, seq.indicators, cfg) });
+        }
+
+        if (attempt < N) {
+            showMsg(`Evaluating… ${attempt} / ${N}`);
+            setTimeout(run, 0);
+            return;
+        }
+
+        scored.sort((a, b) => b.score - a.score);
+        showMsg(null);
+        renderTop10(scored.slice(0, 10), cfg);
+    }
+
+    setTimeout(run, 10);
+}
+
+function renderTop10(top10, cfg) {
+    const nPass = top10.filter(e => checkConstraints(e.rows, e.seq.indicators, cfg).pass).length;
+    document.getElementById('top10_sub').textContent = `(${nPass} of 10 pass all hard constraints)`;
+
+    document.getElementById('top10_grid').innerHTML = top10.map((e, i) => {
+        const chk = checkConstraints(e.rows, e.seq.indicators, cfg);
+        const cls = chk.pass ? 'passes' : '';
+        const g   = n => e.rows.find(r => r.n === n);
+        const kv  = [5, 8, 12, 16].map(n => { const r=g(n); return r ? `n=${n}: ${r.dist.toFixed(1)}` : ''; }).filter(Boolean).join(' · ');
+        return `<div class="top10-card ${cls}">
+            <div class="top10-rank">#${i+1} · score ${e.score.toFixed(0)} · ${chk.pass ? '✓ passes' : '✗ fails'}</div>
+            <div class="top10-d">D = ${e.seq.D.toFixed(1)}</div>
+            <div class="top10-meta">dist at: ${kv}</div>
+            <div class="top10-meta" style="color:#aaa">seed: ${e.seq.seed}</div>
+            <button class="top10-use" onclick="useEntry(${i})">Use this sequence</button>
+        </div>`;
+    }).join('');
+
+    window._top10 = { top10, cfg };
+    document.getElementById('out_top10').classList.remove('hidden');
+}
+
+function useEntry(i) {
+    const { top10, cfg } = window._top10;
+    const e = top10[i];
+    displayResult(e.seq, e.rows, cfg);
+    document.getElementById('out_main').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ============================================================
+   Event wiring
+   ============================================================ */
+document.getElementById('btn_one').addEventListener('click', doOne);
+document.getElementById('btn_until').addEventListener('click', doUntil);
+document.getElementById('btn_top10').addEventListener('click', doTop10);
+
+document.getElementById('btn_copy_csv').addEventListener('click', function () {
+    if (!_seq) return;
+    copyText(_seq.indicators.map(z => z.toFixed(1)).join(', '), this);
+});
+
+document.getElementById('btn_dl_csv').addEventListener('click', () => {
+    if (!_seq) return;
+    downloadFile(buildCSV(_seq, _rows, _cfg),
+        `demand_signals_D${_seq.D.toFixed(0)}_${_seq.seed}.csv`, 'text/csv');
+});
+
+// Dim the D-range inputs when manual D is selected
+document.querySelectorAll('input[name="d_mode"]').forEach(r =>
+    r.addEventListener('change', () => {
+        const isRand = document.getElementById('d_rand').checked;
+        const grp = document.getElementById('d_range_grp');
+        grp.style.opacity       = isRand ? '1' : '0.4';
+        grp.style.pointerEvents = isRand ? ''  : 'none';
+    })
+);
+</script>
+</body>
+</html>
